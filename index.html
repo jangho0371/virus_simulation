@@ -3223,7 +3223,10 @@
 			divAdjust = '초당 @@@일을 시뮬레이션함<br/><font style="color:grey; font-size: 0.8vmax;"> (기기의 시스템 시계 시간에 의존함)</font>'
 		}
 		parameterData[17] = {name: 'daysEverySecond', div: divAdjust,initValue: 3, max: 20, min: 1, step: 1, color: '198, 100%, 50%', transform: 'parseInt(#paraValue#)', requiresReset: true, runFAtEnd: 'setAnimationDetails()'}
-		
+		parameterData[18] = {name: 'howManyWearMask', div: '마스크 착용자 비율 @@@%',initValue: 6, max: 100, min: 0, step: 0.01, color: '231, 79%, 39%', transform: 'parseFloat(#paraValue#)/100', requiresReset: true, runFAtEnd: 'setAnimationDetails()'}
+		parameterData[19] = {name: 'maskInfectionDown', div: '마스크 미착용자 -> 착용자 감염율 감소량 @@@%',initValue: 30, max: 100, min: 0, step: 0.01, color: '231, 79%, 39%', transform: 'parseFloat(#paraValue#)/100', requiresReset: false, runFAtEnd: ''}
+		parameterData[20] = {name: 'maskInfectionDownWithInfection', div: '마스크 착용자 -> 미착용자 감염율 감소량 @@@%',initValue: 95, max: 100, min: 0, step: 0.01, color: '0, 87%, 39%', transform: 'parseFloat(#paraValue#)/100', requiresReset: false, runFAtEnd: ''}
+		parameterData[21] = {name: 'maskInfectionDownBoth', div: '마스크 착용자 -> 착용자 감염율 감소량 @@@%',initValue: 98.5, max: 100, min: 0, step: 0.01, color: '0, 87%, 39%', transform: 'parseFloat(#paraValue#)/100', requiresReset: false, runFAtEnd: ''}
 
 		parameterSliderRMap = {}
 
@@ -3550,7 +3553,7 @@
 		addVariousParameters()
 
 		infectionStates = ['infected', 'susceptible', 'removed']
-		stateColors = {'infected':'10, 100%,70%','susceptible': '195, 100%, 50%', 'removed':'190, 0%, 40%', 'noSymptoms' : '58, 100%, 50%'}
+		stateColors = {'infected':'10, 100%,70%','susceptible': '195, 100%, 50%', 'removed':'190, 0%, 40%', 'noSymptoms' : '58, 100%, 50%', 'wearMasks' : '231, 79%, 39%', 'wearMasksWithInfection' : '0, 67%, 46%', 'wearMasksWithNoSymptom' : '40, 77%, 48%'}
 
 		loopcount = 0
 		timecount = 0
@@ -3828,7 +3831,6 @@
 				if (particleIndex < parseInt(totalparticles*initiallyInfectedN)) {
 					particleData[boundaryN][particleID].state = 'infected'
 					particleCounts[graphN]['infected'] = particleCounts[graphN]['infected'] + 1
-
 				}
 				else {
 					particleData[boundaryN][particleID].state = 'susceptible'
@@ -3849,6 +3851,18 @@
 				if (Math.random() < simulationParameters.probabilityOfNoSymptoms && particleData[boundaryN][particleID].state == 'infected') {
 					particleData[boundaryN][particleID].showsSymptoms = false
 					particleData[boundaryN][particleID].color = stateColors['noSymptoms']
+					if (Math.random() < simulationParameters.howManyWearMask && particleData[boundaryN][particleID].state == 'infected') {
+						particleData[boundaryN][particleID].color = stateColors['wearMasksWithNoSymptom']
+					}
+				}
+				if (Math.random() < simulationParameters.howManyWearMask && particleData[boundaryN][particleID].state == 'susceptible') {
+					particleData[boundaryN][particleID].color = stateColors['wearMasks']
+				}
+				if (Math.random() < simulationParameters.howManyWearMask && particleData[boundaryN][particleID].state == 'infected') {
+					particleData[boundaryN][particleID].color = stateColors['wearMasksWithInfection']
+					if (Math.random() < simulationParameters.probabilityOfNoSymptoms && particleData[boundaryN][particleID].state == 'infected') {
+						particleData[boundaryN][particleID].color = stateColors['wearMasksWithNoSymptom']
+					}
 				}
 
 
@@ -4698,8 +4712,110 @@
 
 							if (distF(vicinityParticlePos, mainParticlePos) < simulationParameters.infectionRadius && mainParticle != vicinityParticle && particleData[ofBoundary][vicinityParticle].state == 'susceptible') {
 								options = {}
-								particleData[ofBoundary][vicinityParticle].state = 'infected'
-								particleData[ofBoundary][vicinityParticle].color = stateColors['infected']
+								if ((particleData[ofBoundary][mainParticle].color == stateColors['infected'] || particleData[ofBoundary][mainParticle].color == stateColors['noSymptoms']) && particleData[ofBoundary][vicinityParticle].color == stateColors['wearMasks']){
+									if (Math.random() > simulationParameters.maskInfectionDown){
+										particleData[ofBoundary][vicinityParticle].state = 'infected'
+										particleData[ofBoundary][vicinityParticle].color = stateColors['wearMasksWithInfection']
+										graphForParticle = boundaryData[ofBoundary]['graph']
+										particleCounts[graphForParticle]['susceptible'] = particleCounts[graphForParticle]['susceptible'] - 1
+										particleCounts[graphForParticle]['infected'] = particleCounts[graphForParticle]['infected'] + 1
+
+										zoneP = particleVicinityDB[ofBoundary][vicinityN[0] + '&' + vicinityN[1]]
+
+										particleVicinityDB[ofBoundary][vicinityN[0] + '&' + vicinityN[1]].splice(zoneP.indexOf(vicinityParticle), 1)
+
+										options.pointcolor = 'hsla(' + particleData[ofBoundary][vicinityParticle].color + ',1)'
+										if (Math.random() < simulationParameters.probabilityOfNoSymptoms) {
+											particleData[ofBoundary][vicinityParticle].showsSymptoms = false
+											particleData[ofBoundary][vicinityParticle].color = stateColors['wearMasksWithNoSymptom']
+											options.pointcolor = 'hsla(' + particleData[ofBoundary][vicinityParticle].color + ',1)'
+										}
+										updatePoint(boundaryData[ofBoundary]['graph'], 'particle@' + vicinityParticle, options)
+									}
+								}
+								else if ((particleData[ofBoundary][mainParticle].color == stateColors['wearMasksWithInfection'] || particleData[ofBoundary][mainParticle].color == stateColors['wearMasksWithNoSymptom']) && particleData[ofBoundary][vicinityParticle].color == stateColors['susceptible']){
+									if (Math.random() > simulationParameters.maskInfectionDownWithInfection){
+										particleData[ofBoundary][vicinityParticle].state = 'infected'
+										particleData[ofBoundary][vicinityParticle].color = stateColors['infected']
+										graphForParticle = boundaryData[ofBoundary]['graph']
+										particleCounts[graphForParticle]['susceptible'] = particleCounts[graphForParticle]['susceptible'] - 1
+										particleCounts[graphForParticle]['infected'] = particleCounts[graphForParticle]['infected'] + 1
+
+										zoneP = particleVicinityDB[ofBoundary][vicinityN[0] + '&' + vicinityN[1]]
+
+										particleVicinityDB[ofBoundary][vicinityN[0] + '&' + vicinityN[1]].splice(zoneP.indexOf(vicinityParticle), 1)
+
+										options.pointcolor = 'hsla(' + particleData[ofBoundary][vicinityParticle].color + ',1)'
+										if (Math.random() < simulationParameters.probabilityOfNoSymptoms) {
+											particleData[ofBoundary][vicinityParticle].showsSymptoms = false
+											particleData[ofBoundary][vicinityParticle].color = stateColors['noSymptoms']
+											options.pointcolor = 'hsla(' + particleData[ofBoundary][vicinityParticle].color + ',1)'
+										}
+										updatePoint(boundaryData[ofBoundary]['graph'], 'particle@' + vicinityParticle, options)
+									}
+								}
+								else if ((particleData[ofBoundary][mainParticle].color == stateColors['wearMasksWithInfection'] || particleData[ofBoundary][mainParticle].color == stateColors['wearMasksWithNoSymptom']) && particleData[ofBoundary][vicinityParticle].color == stateColors['wearMasks']){
+									if (Math.random() > simulationParameters.maskInfectionDownBoth){
+										particleData[ofBoundary][vicinityParticle].state = 'infected'
+										particleData[ofBoundary][vicinityParticle].color = stateColors['wearMasksWithInfection']
+										graphForParticle = boundaryData[ofBoundary]['graph']
+										particleCounts[graphForParticle]['susceptible'] = particleCounts[graphForParticle]['susceptible'] - 1
+										particleCounts[graphForParticle]['infected'] = particleCounts[graphForParticle]['infected'] + 1
+
+										zoneP = particleVicinityDB[ofBoundary][vicinityN[0] + '&' + vicinityN[1]]
+
+										particleVicinityDB[ofBoundary][vicinityN[0] + '&' + vicinityN[1]].splice(zoneP.indexOf(vicinityParticle), 1)
+
+										options.pointcolor = 'hsla(' + particleData[ofBoundary][vicinityParticle].color + ',1)'
+										if (Math.random() < simulationParameters.probabilityOfNoSymptoms) {
+											particleData[ofBoundary][vicinityParticle].showsSymptoms = false
+											particleData[ofBoundary][vicinityParticle].color = stateColors['wearMasksWithNoSymptom']
+											options.pointcolor = 'hsla(' + particleData[ofBoundary][vicinityParticle].color + ',1)'
+										}
+										updatePoint(boundaryData[ofBoundary]['graph'], 'particle@' + vicinityParticle, options)
+									}
+								}
+								else {
+									particleData[ofBoundary][vicinityParticle].state = 'infected'
+									particleData[ofBoundary][vicinityParticle].color = stateColors['infected']
+									particleInfectionCount[graphForParticle][mainParticle].infectionC = particleInfectionCount[graphForParticle][mainParticle].infectionC + 1
+
+									graphForParticle = boundaryData[ofBoundary]['graph']
+									particleCounts[graphForParticle]['susceptible'] = particleCounts[graphForParticle]['susceptible'] - 1
+									particleCounts[graphForParticle]['infected'] = particleCounts[graphForParticle]['infected'] + 1
+
+									zoneP = particleVicinityDB[ofBoundary][vicinityN[0] + '&' + vicinityN[1]]
+
+									particleVicinityDB[ofBoundary][vicinityN[0] + '&' + vicinityN[1]].splice(zoneP.indexOf(vicinityParticle), 1)
+
+									options.pointcolor = 'hsla(' + particleData[ofBoundary][vicinityParticle].color + ',1)'
+									if (Math.random() < simulationParameters.probabilityOfNoSymptoms) {
+										particleData[ofBoundary][vicinityParticle].showsSymptoms = false
+										particleData[ofBoundary][vicinityParticle].color = stateColors['noSymptoms']
+										options.pointcolor = 'hsla(' + particleData[ofBoundary][vicinityParticle].color + ',1)'
+									}
+									updatePoint(boundaryData[ofBoundary]['graph'], 'particle@' + vicinityParticle, options)
+								}
+							}
+						}
+						/*if (Math.random() < simulationParameters.probabilityofInfection) {
+							if (interactionAnimation) {
+								if (particleData[ofBoundary][mainParticle].state == 'infected') {
+									if (particleData[ofBoundary][mainParticle].infectionAnimation == false) {
+										particleData[ofBoundary][mainParticle].infectionAnimation = true
+										particleData[ofBoundary][mainParticle].infectionAnimationFrame = 0
+									}
+								}
+							}
+
+							vicinityParticle = particlesSusceptible[vicinityPIndex]
+							vicinityParticlePos = [particleData[ofBoundary][vicinityParticle].x, particleData[ofBoundary][vicinityParticle].y]
+							mainParticlePos = [particleData[ofBoundary][mainParticle].x, particleData[ofBoundary][mainParticle].y]
+
+							if (distF(vicinityParticlePos, mainParticlePos) < simulationParameters.infectionRadius && mainParticle != vicinityParticle && particleData[ofBoundary][vicinityParticle].state == 'wearMasks') {
+								options = {}
+								particleData[ofBoundary][vicinityParticle].state = 'wearMasksWithInfection'
+								particleData[ofBoundary][vicinityParticle].color = stateColors['wearMasksWithInfection']
 
 								particleInfectionCount[graphForParticle][mainParticle].infectionC = particleInfectionCount[graphForParticle][mainParticle].infectionC + 1
 
@@ -4714,12 +4830,12 @@
 								options.pointcolor = 'hsla(' + particleData[ofBoundary][vicinityParticle].color + ',1)'
 								if (Math.random() < simulationParameters.probabilityOfNoSymptoms) {
 									particleData[ofBoundary][vicinityParticle].showsSymptoms = false
-									particleData[ofBoundary][vicinityParticle].color = stateColors['noSymptoms']
+									particleData[ofBoundary][vicinityParticle].color = stateColors['wearMasksWithNoSymptom']
 									options.pointcolor = 'hsla(' + particleData[ofBoundary][vicinityParticle].color + ',1)'
 								}
 								updatePoint(boundaryData[ofBoundary]['graph'], 'particle@' + vicinityParticle, options)
 							}
-						}
+						}*/
 					}
 
 					particleData[ofBoundary][mainParticle].daysSinceInfection = particleData[ofBoundary][mainParticle].daysSinceInfection + 1
